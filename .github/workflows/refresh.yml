@@ -1,0 +1,60 @@
+name: Refresh Indonesia journal map
+
+on:
+  schedule:
+    - cron: '17 20 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indonesia-journal-map-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+      GEOCODER_CONTACT: ${{ vars.GEOCODER_CONTACT }}
+      MAX_NEW_GEOCODES: '1500'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            data/geocode-cache.json
+            data/registry-cache.json
+          key: geocode-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            geocode-${{ runner.os }}-
+      - name: Test
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          node --test tests/*.test.mjs
+      - name: Check configuration
+        run: |
+          test -n "$OPENALEX_API_KEY" || { echo 'OPENALEX_API_KEY secret is required'; exit 1; }
+          test -n "$GEOCODER_CONTACT" || { echo 'GEOCODER_CONTACT variable is required'; exit 1; }
+      - name: Collect and build
+        run: |
+          python3 scripts/collect.py
+          python3 scripts/registry.py
+          python3 scripts/geocode.py
+          python3 scripts/build.py
+          python3 scripts/validate.py build/site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: indonesia-journal-map-${{ github.run_id }}
+          path: build/site
+          if-no-files-found: error
+          retention-days: 14
+

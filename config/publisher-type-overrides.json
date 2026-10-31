@@ -1,0 +1,12 @@
+{
+  "_comment": "Manual publisher types; these win over every automatic rule. Keys are publisher names (matched case- and punctuation-insensitively, also as part of a longer name) or OpenAlex publisher IDs. Types: education, government, private, other.",
+  "names": {
+    "Indonesian Institute for Counseling, Education and Therapy": "private",
+    "Universitas Nurul Jadid": "education",
+    "MAN Insan Cendekia": "education"
+  },
+  "ids": {
+    "I4405262604": "education",
+    "P4404674866": "education"
+  }
+}

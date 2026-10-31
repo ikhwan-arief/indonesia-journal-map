@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="An atlas of Indonesian scholarly journals, mapped by the city of each journal's publisher, using OpenAlex, DOAJ and Crossref data.">
+  <meta name="theme-color" content="#F5F3ED">
+  <title>Indonesian Journal Atlas</title>
+  <link rel="preload" href="assets/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/style.css?v=12">
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+
+  <header class="masthead">
+    <div class="container masthead-inner">
+      <a class="wordmark" href="./" aria-label="Indonesian Journal Atlas, home">
+        <svg class="monogram" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5"/><path d="M16 2.5v27M2.5 16h27"/><circle class="dot" cx="16" cy="16" r="3.2"/></svg>
+        <span>Indonesian Journal Atlas</span>
+      </a>
+      <p id="updated" class="edition">Loading data…</p>
+    </div>
+  </header>
+
+  <main id="content">
+    <section class="container hero">
+      <div class="hero-title">
+        <h1>Indonesian Journal Atlas</h1>
+        <p class="lede">Where Indonesia's scholarly journals are published, mapped by the city of each journal's publishing organisation.</p>
+      </div>
+    </section>
+
+    <div class="container">
+      <section id="status" class="status" hidden role="alert"></section>
+      <section id="kpis" class="kpis" aria-label="Summary" aria-live="polite"></section>
+    </div>
+
+    <section class="container map-section" aria-labelledby="map-heading">
+      <div class="section-head">
+        <div><p class="eyebrow">Distribution by city</p><h2 id="map-heading">Journal map</h2></div>
+        <div class="toolbar">
+          <div class="segmented" role="group" aria-label="Journals shown">
+            <button id="mode-all" type="button" data-mode="all" aria-pressed="true">All journals</button>
+            <button id="mode-diamond" type="button" data-mode="diamond" aria-pressed="false">Diamond OA</button>
+            <button id="mode-doaj" type="button" data-mode="doaj" aria-pressed="false">DOAJ indexed</button>
+          </div>
+          <div class="map-actions" role="group" aria-label="Map controls">
+            <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+            <button id="zoom-reset" type="button">Reset</button>
+            <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          </div>
+        </div>
+      </div>
+      <p id="mode-note" class="mode-note" hidden></p>
+      <div id="map-wrap" class="map-wrap">
+        <svg id="map" viewBox="0 0 1000 430" tabindex="0" role="img" aria-labelledby="map-title map-desc">
+          <title id="map-title">Map of Indonesian journals by city</title>
+          <desc id="map-desc">Select a bubble to filter the journal table by city. When zoomed in, drag or use the arrow keys to move the map.</desc>
+          <g id="viewport"><g id="land" class="land" aria-hidden="true"></g><g id="bubbles"></g></g>
+          <g id="legend" class="legend" aria-hidden="true"></g>
+        </svg>
+        <div id="tooltip" class="tooltip" hidden></div>
+      </div>
+      <p class="map-note">Zoom in with + or a pinch, then drag to move around the map. Boundaries: Natural Earth (public domain), simplified. Journals without a verified location are not placed on invented coordinates.</p>
+    </section>
+
+    <section class="container breakdown-section" aria-label="Breakdowns">
+      <div class="breakdown">
+        <div class="breakdown-col">
+          <div class="section-head compact"><div><p class="eyebrow">By location</p><h2>Provinces &amp; cities</h2></div></div>
+          <p class="breakdown-hint">Ranked by number of journals. Open a province to see its cities; select a city to filter the table.</p>
+          <div id="province-list" class="rank-list"></div>
+        </div>
+        <div class="breakdown-col">
+          <div class="breakdown-block">
+            <div class="section-head compact"><div><p class="eyebrow">By discipline</p><h2>Fields of science</h2></div></div>
+            <p class="breakdown-hint">Each journal's main field from its OpenAlex topics, grouped by domain. Select a field to filter the table.</p>
+            <div id="field-list" class="rank-list"></div>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-head compact"><div><p class="eyebrow">By publisher</p><h2>Type of publisher</h2></div></div>
+            <div id="type-list" class="rank-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container data-section" aria-labelledby="table-title">
+      <div class="section-head">
+        <div><p class="eyebrow">Journal directory</p><h2 id="table-title">All journals</h2></div>
+        <div class="table-actions">
+          <button id="show-unmapped" type="button" class="secondary">Show unmapped journals</button>
+          <button id="clear-filters" type="button">Clear filters</button>
+        </div>
+      </div>
+      <div class="filters">
+        <label>Search title, ISSN or publisher<input id="search" type="search" autocomplete="off" placeholder="e.g. engineering, 1234-5678, university"></label>
+        <label>City<select id="city-filter"><option value="">All cities</option><option value="__unmapped__">Location not determined</option></select></label>
+        <label>Field<select id="field-filter"><option value="">All fields</option></select></label>
+        <label>Publisher type<select id="type-filter"><option value="">All types</option></select></label>
+      </div>
+      <p id="result-count" class="result-count" aria-live="polite"></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Journal</th><th>Publisher</th><th>City / province</th><th>Field</th><th>ISSN-L</th><th class="num">Works</th><th>Access</th></tr></thead>
+          <tbody id="journal-rows"></tbody>
+        </table>
+      </div>
+      <nav class="pagination" aria-label="Table pages"><button id="previous" type="button">Previous</button><span id="page-status"></span><button id="next" type="button">Next</button></nav>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p class="footer-mark">Indonesian Journal Atlas</p>
+      <p>Metadata: <a href="https://openalex.org" rel="noopener">OpenAlex</a> (CC0), <a href="https://doaj.org" rel="noopener">DOAJ</a>, <a href="https://www.crossref.org" rel="noopener">Crossref</a>. Base map: <a href="https://www.naturalearthdata.com" rel="noopener">Natural Earth</a> (public domain). Type: Newsreader &amp; DM Sans (SIL OFL).</p>
+    </div>
+  </footer>
+  <script type="module" src="assets/app.js?v=21"></script>
+</body>
+</html>
