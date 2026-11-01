@@ -80,3 +80,7 @@ node --test tests/*.test.mjs
 
 Lihat [metodologi](docs/METHODOLOGY.md) dan [operasi](docs/OPERATIONS.md) untuk rincian.
 
+
+## Wilayah resmi
+
+`data/wilayah.json` berisi kode dan batas wilayah administrasi Kemendagri (via github.com/cahyadsn/wilayah, MIT). Build memakainya untuk menyeragamkan setiap lokasi ke kabupaten/kota resmi. Untuk memperbarui data wilayah, jalankan `python3 scripts/wilayah.py`.

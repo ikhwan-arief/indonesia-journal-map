@@ -16,6 +16,17 @@ Lokasi dipilih dengan urutan koreksi manual, metadata OpenAlex, metadata ROR, la
 
 Nama `Kota X` dan `X` dinormalisasi menjadi kota yang sama. Nama provinsi dari OpenAlex dan ROR (bahasa Inggris, misalnya `West Java`) serta dari Nominatim (bahasa Indonesia) diseragamkan ke nama resmi, misalnya `Jawa Barat`. Lokasi tanpa provinsi memakai provinsi kota bernama sama bila hanya ada satu kemungkinan; bila ada lebih dari satu, kota tetap terpisah dan perlu override. Nama yang sekadar mirip tidak digabung. Jurnal tanpa lokasi yang dapat diterima diberi status `unmapped` dan tidak ditempatkan pada titik nasional buatan.
 
+## Kabupaten/kota resmi
+
+Semua lokasi akhirnya diseragamkan ke kabupaten/kota resmi menurut kode wilayah Kemendagri (Kepmendagri No 300.2.2-2138 Tahun 2025, lewat data terbuka github.com/cahyadsn/wilayah, lisensi MIT). Data ini memuat 38 provinsi, 514 kabupaten/kota (dengan koordinat ibu kota dan batas wilayah), 7.285 kecamatan, dan 83.762 kelurahan/desa, dan disimpan di `data/wilayah.json` (dibuat ulang dengan `python3 scripts/wilayah.py`). Urutan pencocokan:
+
+1. Nama kabupaten/kota, termasuk bentuk Inggris ("South Tangerang" = Tangerang Selatan).
+2. Nama ibu kota kabupaten (Purwokerto → Banyumas, Singaraja → Buleleng, Cibinong → Bogor).
+3. Nama kecamatan atau kelurahan/desa, bila unik di provinsinya atau dekat titik koordinatnya (Tembalang → Semarang, Jatinangor → Sumedang, Ciputat → Tangerang Selatan).
+4. Batas wilayah yang memuat titik koordinat.
+
+Kota dan kabupaten yang bernama sama dalam satu provinsi (Kota/Kabupaten Bogor, Malang, Semarang, dll.) ditampilkan sebagai satu kota di titik pusat kotanya, dan lima kota administrasi DKI Jakarta ditampilkan sebagai Jakarta. Lokasi institusi yang salah di sumbernya (ROR/OpenAlex memilih desa lain bernama sama) dikoreksi di `config/location-overrides.json` beserta catatannya. Hasil pencocokan tercatat di `location-audit.json` (`official_areas`).
+
 ## Pemulihan lokasi tingkat jurnal
 
 Jurnal yang penerbitnya kosong di OpenAlex atau tidak dapat dilokasikan diberi lokasi cadangan secara berurutan:
@@ -23,6 +34,8 @@ Jurnal yang penerbitnya kosong di OpenAlex atau tidak dapat dilokasikan diberi l
 1. **Domain situs jurnal** (`homepage-domain`): domain terdaftar (mis. `unej.ac.id`) harus cocok dengan tepat satu institusi Indonesia di OpenAlex yang memiliki koordinat. Domain bersama (platform hosting) dan domain yang cocok dengan beberapa institusi diabaikan.
 2. **Nama penerbit dari registri ISSN** (`registry-publisher`): nama penerbit di DOAJ (hanya rekaman berasal Indonesia) atau Crossref dicocokkan dengan nama institusi. Pencocokan memakai kunci kata tanpa urutan yang menyamakan bentuk Indonesia/Inggris (mis. "Universitas Jember" = "University of Jember") dan singkatan UIN/IAIN/STAIN. Bila tidak cocok dan namanya jelas berupa institusi pendidikan, nama tersebut di-geocode dengan aturan penerimaan Nominatim yang sama.
 3. **Alamat member Crossref dari DOI** (`crossref-member`): setiap DOI didaftarkan oleh *member* Crossref (biasanya penerbitnya), yang mencatat alamat seperti "Padang, West Sumatra, Indonesia". Member pendaftar DOI jurnal dicari lewat ISSN (`/journals/{issn}/works`), lalu kota dari alamat member dicocokkan dengan kota yang sudah dikenal di provinsi yang sama. Bila tidak ada yang cocok, alamat di-geocode dengan Nominatim, dan hasil yang provinsinya berbeda ditolak. Bagian alamat berupa jalan (Jl., Komplek, nomor) diabaikan, dan alamat yang hanya berisi "Indonesia" tidak dipakai. Hanya member yang alamatnya di Indonesia yang dipakai.
+
+Bila OpenAlex, DOAJ, dan Crossref tidak mencatat nama penerbit sebuah jurnal, nama member Crossref pendaftar DOI-nya dipakai sebagai nama penerbit (`publisher.source = crossref-member`). Nama ini juga ikut dipakai untuk menentukan jenis penerbit.
 
 Jurnal tanpa penerbit, tanpa situs, atau dengan penerbit independen yang tidak tercatat tetap berstatus belum terpetakan. Alasannya tercatat di `location-audit.json`.
 

@@ -13,6 +13,7 @@ from common import PipelineError
 from geocode import (InstitutionIndex, KnownCities, from_nominatim, member_place, from_ror, name_key, normalize_city, normalize_province,
                      registrable_domain, resolve, resolve_journals)
 from validate import validate_snapshot
+from wilayah import Gazetteer, clean, simplify
 from validate import validate_site
 
 
@@ -221,6 +222,32 @@ class EnrichmentTests(unittest.TestCase):
         place = member_place({"location": "Bantul, Yogyakarta, Indonesia"}, known, {}, client, budget, None)
         self.assertEqual(place["city"], "Bantul")
         self.assertIsNone(member_place({"location": "Bantul, East Java, Indonesia"}, known, {}, client, budget, None))
+
+    def test_official_areas(self):
+        square = lambda lat, lng, d=0.2: [[lat - d, lng - d], [lat - d, lng + d], [lat + d, lng + d], [lat + d, lng - d], [lat - d, lng - d]]
+        data = {"source": "test", "provinces": {"32": "Jawa Barat", "33": "Jawa Tengah", "31": "DKI Jakarta"},
+                "regencies": {"32.71": {"name": "Kota Bogor", "capital": "Bogor", "lat": -6.59, "lng": 106.79, "rings": [square(-6.59, 106.79, 0.05)]},
+                              "32.01": {"name": "Kabupaten Bogor", "capital": "Cibinong", "lat": -6.48, "lng": 106.82, "rings": [square(-6.5, 106.6)]},
+                              "33.02": {"name": "Kabupaten Banyumas", "capital": "Purwokerto", "lat": -7.42, "lng": 109.23, "rings": [square(-7.42, 109.23)]},
+                              "31.74": {"name": "Kota Administrasi Jakarta Selatan", "capital": "Kebayoran Baru", "lat": -6.25, "lng": 106.81, "rings": [square(-6.25, 106.81, 0.05)]}},
+                "districts": {"32.01.01": "Dramaga", "33.02.01": "Purwokerto Utara", "33.02.02": "Purwokerto Selatan"},
+                "villages": {"31.74.01.1001": "Palmerah"}}
+        g = Gazetteer(data)
+        city = lambda *args: (lambda c: (c[0]["city"], c[1]) if c[0] else None)(g.locate(*args))
+        self.assertEqual(city("Kabupaten Bogor"), ("Bogor", "city"))  # kota and kabupaten of one name are one city
+        self.assertEqual(g.locate("Bogor")[0]["latitude"], -6.59)    # placed at the kota's centre
+        self.assertEqual(city("Cibinong"), ("Bogor", "capital"))
+        self.assertEqual(city("Purwokerto", "Jawa Tengah"), ("Banyumas", "capital"))
+        self.assertEqual(city("Kec. Dramaga", "Jawa Barat"), ("Bogor", "district"))
+        self.assertIsNone(city("Dramaga"))                             # a bare district name needs a province or a point
+        self.assertEqual(city("Dramaga", None, -6.55, 106.72), ("Bogor", "district"))
+        self.assertEqual(city("South Jakarta"), ("Jakarta", "city"))
+        self.assertEqual(city("Palmerah", "DKI Jakarta"), ("Jakarta", "village"))
+        self.assertEqual(city("Somewhere", None, -6.45, 106.55), ("Bogor", "boundary"))
+        self.assertIsNone(city("Somewhere", None, 0.0, 120.0))
+        self.assertEqual(clean("Kota Administrasi Jakarta Selatan"), "jakarta selatan")
+        self.assertEqual(clean("South Tangerang City"), "tangerang selatan")
+        self.assertEqual(len(simplify(square(0, 0), 0.01)), 5)  # closed rings keep their corners
 
     def test_publisher_type(self):
         inst = {"I1": {"type": "education"}, "I2": {"type": "government"}, "I3": {"type": "company"},

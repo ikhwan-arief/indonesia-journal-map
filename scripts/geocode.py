@@ -360,7 +360,7 @@ class KnownCities:
 PROVINCE_KEYS = {normalize_text(name) for name in PROVINCES}
 
 
-def member_place(member, known, cache, client, budget, cache_path):
+def member_place(member, known, cache, client, budget, cache_path, gazetteer=None):
     """Crossref member address ("Padang, West Sumatra, Indonesia") -> city place, or None."""
     parts = [part.strip(" .") for part in str((member or {}).get("location") or "").split(",") if part.strip(" .")]
     parts = [part for part in parts if "http" not in part and "://" not in part]
@@ -373,6 +373,11 @@ def member_place(member, known, cache, client, budget, cache_path):
     # "Jakarta" or "Jambi" alone is a city; a province only counts after the first part ("Padang, West Sumatra").
     province = next((part for part in parts[1:] if is_province(part)), None)
     cities = [part for part in parts if part is not province]
+    if gazetteer:  # official kabupaten/kota, kecamatan and kelurahan names first
+        for part in cities or parts:
+            city, _ = gazetteer.locate(part, province or (parts[0] if len(parts) == 1 else None))
+            if city:
+                return location(city["city"], city["province"], city["latitude"], city["longitude"], "crossref-member")
     if len(parts) == 1 and is_province(parts[0]):
         place = known.find(parts[0], parts[0]) or known.find(parts[0])
         return dict(place, source="crossref-member") if place else None
@@ -402,6 +407,8 @@ def resolve_journals(input_data, resolved, registry, cache, client, budget, cach
     """Journal-level fallback for journals whose publisher is missing or could not be located."""
     index = index or InstitutionIndex(input_data.get("institutions_index"))
     known = KnownCities(list(index.places.values()) + list(resolved.values()))
+    from wilayah import Gazetteer  # local import: wilayah itself imports this module
+    gazetteer = Gazetteer.load()
     places, reasons, sources = {}, {}, {}
     for journal in input_data.get("journals", []):
         if journal.get("publisher_id") in resolved:
@@ -419,7 +426,7 @@ def resolve_journals(input_data, resolved, registry, cache, client, budget, cach
                 reason = reason if not journal.get("publisher_id") else "publisher_not_located"
         if not place:
             member = crossref_member(journal, registry)
-            place = member_place(member, known, cache, client, budget, cache_path) if member else None
+            place = member_place(member, known, cache, client, budget, cache_path, gazetteer) if member else None
         if place:
             places[journal["id"]] = place
             sources[place["source"]] = sources.get(place["source"], 0) + 1

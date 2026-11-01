@@ -15,6 +15,7 @@ from pathlib import Path
 from common import ROOT, PipelineError, atomic_json, read_json
 from geocode import normalize_city, normalize_text, registrable_domain, valid_coordinates
 from registry import SUSPICIOUS_TITLE, normalize_issn
+from wilayah import Gazetteer
 
 PUBLISHER_STATEMENT = re.compile(r"^(diterbitkan|published by|dikelola|managed by)\b", re.I)
 TITLE_SIMILARITY = 0.6
@@ -48,6 +49,30 @@ def fill_missing_provinces(locations):
                     place = dict(place, province=nearest["province"])
         filled[key] = place
     return filled
+
+
+def official_places(locations, gazetteer):
+    """Snap every place to its official kabupaten/kota (Kepmendagri), so a district or village name such as
+    "Tembalang" or "Jatinangor" is shown as its city, at that city's centre. -> (places, audit)."""
+    if not gazetteer:
+        return locations, {}
+    placed, methods, unmatched = {}, Counter(), Counter()
+    for key, place in locations.items():
+        if not place or not place.get("city"):
+            placed[key] = place
+            continue
+        city, method = gazetteer.locate(place.get("city"), place.get("province"), place.get("latitude"), place.get("longitude"))
+        if city:
+            place = dict(place, city=city["city"], province=city["province"], latitude=city["latitude"],
+                         longitude=city["longitude"], official_match=method)
+            methods[method] += 1
+        else:
+            unmatched[(place.get("city"), place.get("province"))] += 1
+        placed[key] = place
+    audit = {"source": gazetteer.source, "methods": dict(methods),
+             "unmatched": [{"city": city, "province": province, "places": count}
+                           for (city, province), count in unmatched.most_common()]}
+    return placed, audit
 
 
 def journal_issns(row):
@@ -91,12 +116,24 @@ def diamond_status(row, registry):
     return any(not record.get("has_apc") and not record.get("has_other_fees") for record in records)
 
 
+def member_name(row, registry):
+    """Name of the Crossref member that registers this journal's DOIs (usually its publisher)."""
+    member_of = (registry.get("crossref") or {}).get("member_of") or {}
+    members = registry.get("crossref_members") or {}
+    for issn in journal_issns(row):
+        member = members.get(member_of.get(issn) or "")
+        if member and member.get("name"):
+            return member["name"]
+    return None
+
+
 def registry_publisher(row, registry):
     for name in ("doaj", "crossref"):
         for record in registry_records(row, registry, name):
             if record.get("publisher"):
                 return record["publisher"], name
-    return None, None
+    name = member_name(row, registry)
+    return (name, "crossref-member") if name else (None, None)
 
 
 # Publisher type: education | government | private | other. The order of the rules is in publisher_type().
@@ -239,15 +276,17 @@ def publisher_type(row, org, place, institutions, registry_names, overrides=None
 
 
 def registry_publishers(row, registry):
-    return [record["publisher"] for name in ("doaj", "crossref") for record in registry_records(row, registry, name)
-            if record.get("publisher")]
+    names = [record["publisher"] for name in ("doaj", "crossref") for record in registry_records(row, registry, name)
+             if record.get("publisher")]
+    return names + [name for name in [member_name(row, registry)] if name]
 
 
-def build_snapshot(source, location_data, registry=None, type_overrides=None):
+def build_snapshot(source, location_data, registry=None, type_overrides=None, gazetteer=None):
     registry = registry or {}
     merged = dict(location_data.get("locations", {}))
     merged.update({"journal:" + key: value for key, value in (location_data.get("journal_locations") or {}).items()})
     merged = fill_missing_provinces(merged)
+    merged, official_audit = official_places(merged, gazetteer)
     locations = {key: value for key, value in merged.items() if not key.startswith("journal:")}
     journal_locations = {key[8:]: value for key, value in merged.items() if key.startswith("journal:")}
     title_changes = []
@@ -325,22 +364,25 @@ def build_snapshot(source, location_data, registry=None, type_overrides=None):
                         "doaj_mapped": sum(1 for row in journals if row["is_in_doaj"] and row["location"]["status"] == "mapped"),
                         "publisher_types": dict(Counter(row["publisher"]["type"] or "unknown" for row in journals)),
                         "titles_corrected": len(title_changes)},
-            "cities": cities, "journals": journals, "_title_changes": title_changes}
+            "cities": cities, "journals": journals, "_title_changes": title_changes, "_official_audit": official_audit}
 
 
 TYPE_OVERRIDES = ROOT / "config/publisher-type-overrides.json"
 PUBLISHER_TYPES = {"education", "government", "private", "other"}
 
 
-def build_site(input_path, locations_path, output, registry_path=None, type_overrides_path=TYPE_OVERRIDES):
+def build_site(input_path, locations_path, output, registry_path=None, type_overrides_path=TYPE_OVERRIDES,
+               gazetteer_path=ROOT / "data/wilayah.json"):
     registry = read_json(registry_path) if registry_path and registry_path.exists() else {}
     overrides = read_json(type_overrides_path) if type_overrides_path and type_overrides_path.exists() else {}
     bad = {kind for kind in list((overrides.get("names") or {}).values()) + list((overrides.get("ids") or {}).values())
            if kind not in PUBLISHER_TYPES}
     if bad:
         raise PipelineError("Unknown publisher type in overrides: " + ", ".join(sorted(map(str, bad))))
-    snapshot = build_snapshot(read_json(input_path), read_json(locations_path), registry, overrides)
+    gazetteer = Gazetteer.load(gazetteer_path) if gazetteer_path else None
+    snapshot = build_snapshot(read_json(input_path), read_json(locations_path), registry, overrides, gazetteer)
     title_changes = snapshot.pop("_title_changes")
+    official_audit = snapshot.pop("_official_audit")
     previous = output / "data/journals-map.json"
     if previous.exists():
         old_total = read_json(previous).get("summary", {}).get("total_journals", 0)
@@ -354,7 +396,7 @@ def build_site(input_path, locations_path, output, registry_path=None, type_over
         shutil.copytree(ROOT / "web", temporary, dirs_exist_ok=True)
         atomic_json(temporary / "data/journals-map.json", snapshot)
         audit = read_json(locations_path).get("audit", {})
-        atomic_json(temporary / "data/location-audit.json", audit)
+        atomic_json(temporary / "data/location-audit.json", dict(audit, official_areas=official_audit))
         atomic_json(temporary / "data/title-audit.json", {"rule": "DOAJ, then Crossref title by ISSN replaces the OpenAlex "
                     "name when it looks like a publisher statement or similarity < 0.6", "changes": title_changes})
         if backup.exists():

@@ -1,2 +1,37 @@
-{}
-
+{
+  "P4404669912": {
+    "city": "Aceh Utara",
+    "province": "Aceh",
+    "latitude": 5.07571569194339,
+    "longitude": 97.30262386768965,
+    "note": "Malikussaleh University: main campus at Reuleut, Muara Batu, Aceh Utara (ROR places it in Pidie)"
+  },
+  "P4404677429": {
+    "city": "Purworejo",
+    "province": "Jawa Tengah",
+    "latitude": -7.713974600894097,
+    "longitude": 110.00829855421505,
+    "note": "Universitas Muhammadiyah Purworejo (ROR picked a village named Purworejo in Tuban, East Java)"
+  },
+  "I4210139437": {
+    "city": "Sukoharjo",
+    "province": "Jawa Tengah",
+    "latitude": -7.664598872152095,
+    "longitude": 110.83586765421464,
+    "note": "Universitas Bangun Nusantara, Sukoharjo (OpenAlex picked the village Sukoharjo Satu in Lampung)"
+  },
+  "P4404674006": {
+    "city": "Lampung Utara",
+    "province": "Lampung",
+    "latitude": -4.8291901217543,
+    "longitude": 104.88744459932492,
+    "note": "Universitas Muhammadiyah Kotabumi, Kotabumi (ROR picked Sindangsari)"
+  },
+  "P4404661652": {
+    "city": "Bandar Lampung",
+    "province": "Lampung",
+    "latitude": -5.429579213794452,
+    "longitude": 105.26256765111627,
+    "note": "Universitas Mitra Indonesia, Rajabasa, Bandar Lampung (ROR picked a village named Rajabasa in Tanggamus)"
+  }
+}
