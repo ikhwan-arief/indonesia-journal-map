@@ -1,4 +1,6 @@
-build/
+# Pipeline inputs stay local; the built site is committed for GitHub Pages.
+build/*
+!build/site/
 __pycache__/
 *.pyc
 .DS_Store

@@ -23,3 +23,7 @@ Jika suatu tahap gagal, periksa pesan ringkas tanpa menyalin environment variabl
 
 Periksa `build/site/data/location-audit.json`. Untuk salah lokasi, verifikasi alamat organisasi dari sumber resmi lalu tambahkan override beserta alasan. Untuk hasil gagal, jangan membuat koordinat perkiraan tanpa sumber.
 
+
+## Situs publik (GitHub Pages)
+
+Situs publik ada di https://ikhwan-arief.github.io/indonesia-journal-map/. Isinya `build/site` yang di-commit ke repo; `build/input` tetap lokal. Workflow `pages.yml` memvalidasi lalu men-deploy `build/site` setiap kali folder itu berubah di `main`, atau bila dijalankan manual. Untuk memperbarui situs, jalankan pipeline secara lokal, periksa hasilnya, lalu commit `build/site`. Situs ini tidak memuat API key, karena browser hanya membaca snapshot statis.
